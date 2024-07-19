@@ -15,6 +15,7 @@ heads = {'Host': 'www.sec.gov', 'Connection': 'close',
          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36',
          }
 
+
 def download(year):
     for qtr in range(1):
         url = f"https://www.sec.gov/Archives/edgar/full-index/{year}/QTR{qtr+1}/master.idx"
@@ -48,8 +49,8 @@ def MapCIKToTicker():
                 ff.write(f"{flipped_line}\n")
             shutil.move("SECData/tmp", "SECData/CIK.txt")
 
-def GetForm13F():
-    with open("SECData/master2008QTR1.idx", "r") as f:
+def GetForm13F(yr):
+    with open(f"SECData/master{yr}QTR1.idx", "r") as f:
         data = pd.read_csv(f, usecols=range(5))
         index_list = data.loc[data['Form Type'] == '13F-HR'].index.tolist()
         download_urls = data.loc[index_list, 'Filename'].tolist()
@@ -64,17 +65,18 @@ def GetForm13F():
                 os.makedirs(dir)
             with open(file_path, "wb") as f:
                 f.write(response.content)
-    dir = "SECData/2008/13F-HR/"
+    dir = f"SECData/{yr}/13F-HR/"
     for root, dirs, files in os.walk(dir):
         for file in files:
             src_path = os.path.join(root, file)
             dest_path = os.path.join(dir, file)
             shutil.move(src_path, dest_path)
-    if os.path.exists("SECData/2008/13F-HR/edgar"):
-        shutil.rmtree("SECData/2008/13F-HR/edgar")
+    if os.path.exists(f"SECData/{yr}/13F-HR/edgar"):
+        shutil.rmtree(f"SECData/{yr}/13F-HR/edgar")
 
-def ParseForm13F():
-    dir = "SECData/2008/13F-HR"
+
+def ParseForm13F(yr):
+    dir = f"SECData/{yr}/13F-HR"
     relationships = []
     errs = []
     for root, dirs, files in os.walk(dir):
@@ -93,15 +95,17 @@ def ParseForm13F():
                 except:
                     errs.append(soup.find('acceptance-datetime'))
     print(len(errs), errs)
-    with open("SECData/2008/relationships.csv", "w") as f:
+    with open(f"SECData/{yr}/relationships.csv", "w") as f:
         f.write("source,target,weight\n")
         for line in relationships:
             f.write(line)
 
-def ParseForm13F2():
-    df = pd.read_csv("SECData/2008/relationships.csv")
-    df = df[df['source'].str.contains('BlackRock Inc.', na=False)]
+
+def ParseForm13F2(yr, target):
+    df = pd.read_csv(f"SECData/{yr}/relationships.csv")
+    df = df[df['source'].str.contains(target, na=False)]
     df.to_csv('output.csv', index=False)
+
 
 def MapCUSIPToTicker():
     mapping = {}
@@ -114,11 +118,13 @@ def MapCUSIPToTicker():
         for cusip, symbol in mapping.items():
             f.write(f"{cusip},{symbol}\n")
 
+
 def CikToTik(cik):
     with open("SECData/CIK.txt", 'r') as f:
         df = pd.read_csv(f)
         df = df.set_index('cik')
         return df.loc[cik, 'tik']
+
 
 def MapNameToTicker():
     mapping = {}
@@ -128,9 +134,11 @@ def MapNameToTicker():
     with open("SECData/names.txt", "w") as f:
         json.dump(mapping, f)
 
+
 def NameToTick(name):
     with open("SECData/names.txt", "r") as f:
         return json.load(f)[name]
+
 
 def get_targets_recursive(df, source, depth=0, max_depth=5, subset=None):
     threshold = 80
